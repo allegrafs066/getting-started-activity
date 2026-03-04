@@ -18,6 +18,7 @@ a {
   color: #646cff;
   text-decoration: inherit;
 }
+
 a:hover {
   color: #535bf2;
 }
@@ -48,9 +49,11 @@ h1 {
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.vanilla:hover {
   filter: drop-shadow(0 0 2em #f7df1eaa);
 }
@@ -66,9 +69,11 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
 button:hover {
   border-color: #646cff;
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
@@ -79,10 +84,112 @@ button:focus-visible {
     color: #213547;
     background-color: #ffffff;
   }
+
   a:hover {
     color: #747bff;
   }
+
   button {
     background-color: #f9f9f9;
   }
+}
+
+#target-text {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1.5rem;
+  color: #646669;
+  /* Grayed out text */
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.char.correct {
+  color: #d1d0c5;
+  /* Off-white/bright */
+}
+
+.char.incorrect {
+  color: #ca4754;
+  /* Red */
+  background-color: rgba(202, 71, 84, 0.2);
+}
+
+#hidden-input {
+  opacity: 0;
+  position: absolute;
+  z-index: -1;
+}
+
+.char.cursor {
+  border-left: 2px solid #e2b714;
+  animation: blink 1s infinite step-end;
+  margin-left: -2px;
+}
+
+@keyframes blink {
+
+  0%,
+  100% {
+    border-color: transparent;
+  }
+
+  50% {
+    border-color: #e2b714;
+  }
+}
+
+#results-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  animation: fadein 0.5s ease-in-out;
+}
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.final-stats {
+  display: flex;
+  gap: 4rem;
+}
+
+.stat-box h2 {
+  margin: 0;
+  font-size: 2rem;
+  color: #646669;
+  font-weight: normal;
+}
+
+.stat-box p {
+  margin: 0;
+  font-size: 4rem;
+  color: #e2b714;
+  font-weight: bold;
+}
+
+#play-again-btn {
+  font-size: 1.2rem;
+  padding: 1rem 2rem;
+  background-color: transparent;
+  color: #646669;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+#play-again-btn:hover {
+  color: #d1d0c5;
+  background-color: transparent;
+  outline: none;
 }
