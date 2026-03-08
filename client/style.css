@@ -105,7 +105,7 @@ button:focus-visible {
 }
 
 .char.correct {
-  color: #d1d0c5;
+  color: #e2b714;
   /* Off-white/bright */
 }
 
@@ -121,21 +121,26 @@ button:focus-visible {
   z-index: -1;
 }
 
+.char {
+  transition: border-left-color 0.08s ease;
+}
+
 .char.cursor {
   border-left: 2px solid #e2b714;
-  animation: blink 1s infinite step-end;
+  animation: blink 1s infinite;
   margin-left: -2px;
 }
 
 @keyframes blink {
 
   0%,
-  100% {
-    border-color: transparent;
+  49% {
+    border-color: #e2b714;
   }
 
-  50% {
-    border-color: #e2b714;
+  50%,
+  100% {
+    border-color: rgba(226, 183, 20, 0.35);
   }
 }
 
@@ -192,4 +197,216 @@ button:focus-visible {
   color: #d1d0c5;
   background-color: transparent;
   outline: none;
+}
+
+/* ── Game header ──────────────────────────── */
+#game-header {
+  margin-bottom: 1.5rem;
+}
+
+.haiku-label {
+  font-size: 0.85rem;
+  color: #646669;
+  letter-spacing: 0.05em;
+}
+
+.haiku-label em {
+  color: #8b8987;
+  font-style: normal;
+}
+
+/* ── Leaderboard ──────────────────────────── */
+.lb-title {
+  font-size: 1rem;
+  color: #646669;
+  font-weight: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+
+.leaderboard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  max-width: 480px;
+}
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  transition: background 0.2s;
+}
+
+.lb-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lb-first {
+  border: 1px solid rgba(226, 183, 20, 0.3);
+  background: rgba(226, 183, 20, 0.07);
+}
+
+.lb-rank {
+  width: 2rem;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.lb-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.lb-avatar-placeholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #3a3a3a;
+  display: inline-block;
+}
+
+.lb-name {
+  flex: 1;
+  font-size: 0.95rem;
+  color: #d1d0c5;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-wpm {
+  font-size: 1rem;
+  color: #e2b714;
+  font-weight: bold;
+  min-width: 5rem;
+  text-align: right;
+}
+
+.lb-wpm small {
+  font-size: 0.65rem;
+  color: #646669;
+  font-weight: normal;
+}
+
+.lb-acc {
+  font-size: 0.85rem;
+  color: #646669;
+  min-width: 3rem;
+  text-align: right;
+}
+
+/* ── Next haiku countdown ──────────────────── */
+.next-haiku {
+  font-size: 0.85rem;
+  color: #646669;
+  margin-top: 0.5rem;
+}
+
+#countdown {
+  font-family: 'Courier New', Courier, monospace;
+  color: #8b8987;
+}
+
+.loading-label {
+  color: #646669;
+  font-size: 0.9rem;
+}
+
+#leaderboard-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── Share button ──────────────────────────── */
+.share-btn {
+  margin-top: 1.25rem;
+  padding: 0.65rem 1.5rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: rgba(226, 183, 20, 0.1);
+  color: #e2b714;
+  border: 1px solid rgba(226, 183, 20, 0.35);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.share-btn:hover {
+  background: rgba(226, 183, 20, 0.18);
+  border-color: rgba(226, 183, 20, 0.7);
+  box-shadow: 0 0 12px rgba(226, 183, 20, 0.2);
+}
+
+.share-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── Share card modal ──────────────────────── */
+#share-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadein 0.2s ease;
+}
+
+#share-modal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: #1e1e2e;
+  border: 1px solid rgba(226, 183, 20, 0.2);
+  border-radius: 16px;
+  max-width: 90vw;
+}
+
+#share-card-img {
+  max-width: 100%;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.share-hint {
+  font-size: 0.85rem;
+  color: #646669;
+  margin: 0;
+}
+
+.share-hint strong {
+  color: #d1d0c5;
+}
+
+#share-modal-close {
+  font-size: 0.9rem;
+  padding: 0.5rem 1.5rem;
+  background: transparent;
+  color: #646669;
+  border: 1px solid #3a3a4a;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+#share-modal-close:hover {
+  color: #d1d0c5;
+  border-color: #646669;
 }

@@ -15,6 +15,6 @@ export default defineConfig({
     hmr: {
       clientPort: 443,
     },
-    allowedHosts: ['hourly-oil-genealogy-difficulties.trycloudflare.com']
+    allowedHosts: ['telecharger-oven-sharon-fallen.trycloudflare.com']
   },
 });

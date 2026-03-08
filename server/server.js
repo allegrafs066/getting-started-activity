@@ -1,22 +1,55 @@
 import express from "express";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
+import Database from "better-sqlite3";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import path from "path";
 dotenv.config({ path: "../.env" });
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const port = 3001;
-
-// Allow express to parse JSON bodies
 app.use(express.json());
 
+// ─── Database setup ───────────────────────────────────────────────────────────
+const db = new Database("haikuur.db");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS scores (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     TEXT    NOT NULL,
+    username    TEXT    NOT NULL,
+    avatar      TEXT,
+    date        TEXT    NOT NULL,
+    haiku_id    INTEGER NOT NULL,
+    wpm         INTEGER NOT NULL,
+    accuracy    INTEGER NOT NULL,
+    created_at  INTEGER NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_user_date ON scores (user_id, date);
+`);
+
+// ─── Haiku rotation ──────────────────────────────────────────────────────────
+const haikus = JSON.parse(readFileSync(path.join(__dirname, "haikus.json"), "utf8"));
+
+/** Returns today's date as a UTC string: YYYY-MM-DD */
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Deterministic daily pick based on date string */
+function getDailyHaiku(dateStr) {
+  // Simple hash of the date string
+  const seed = dateStr.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return haikus[seed % haikus.length];
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 app.post("/api/token", async (req, res) => {
-  
-  // Exchange the code for an access_token
   const response = await fetch(`https://discord.com/api/oauth2/token`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_id: process.env.VITE_DISCORD_CLIENT_ID,
       client_secret: process.env.DISCORD_CLIENT_SECRET,
@@ -24,12 +57,62 @@ app.post("/api/token", async (req, res) => {
       code: req.body.code,
     }),
   });
-
-  // Retrieve the access_token from the response
   const { access_token } = await response.json();
+  res.send({ access_token });
+});
 
-  // Return the access_token to our client as { access_token: "..."}
-  res.send({access_token});
+// ─── Daily Haiku ─────────────────────────────────────────────────────────────
+app.get("/api/daily", (req, res) => {
+  const dateStr = today();
+  const haiku = getDailyHaiku(dateStr);
+  const existing = db
+    .prepare("SELECT wpm, accuracy FROM scores WHERE user_id = ? AND date = ?")
+    .get(req.query.user_id, dateStr);
+
+  res.json({
+    date: dateStr,
+    haiku: { ...haiku, text: haiku.lines.join("\n") },
+    already_played: !!existing,
+    previous_score: existing || null,
+  });
+});
+
+// ─── Submit Score ─────────────────────────────────────────────────────────────
+app.post("/api/score", (req, res) => {
+  const { user_id, username, avatar, wpm, accuracy } = req.body;
+  const dateStr = today();
+  const haiku = getDailyHaiku(dateStr);
+
+  if (!user_id || !username || wpm == null || accuracy == null) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  try {
+    db.prepare(`
+      INSERT INTO scores (user_id, username, avatar, date, haiku_id, wpm, accuracy, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(user_id, username, avatar || null, dateStr, haiku.id, wpm, accuracy, Date.now());
+    res.json({ success: true });
+  } catch (err) {
+    // Unique constraint violation — user already submitted today
+    if (err.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return res.status(409).json({ error: "Already submitted today" });
+    }
+    throw err;
+  }
+});
+
+// ─── Leaderboard ─────────────────────────────────────────────────────────────
+app.get("/api/leaderboard", (req, res) => {
+  const dateStr = today();
+  const rows = db.prepare(`
+    SELECT user_id, username, avatar, wpm, accuracy
+    FROM scores
+    WHERE date = ?
+    ORDER BY wpm DESC, accuracy DESC
+    LIMIT 10
+  `).all(dateStr);
+  res.json({ date: dateStr, scores: rows });
 });
 
 app.listen(port, () => {

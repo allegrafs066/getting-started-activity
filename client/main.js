@@ -9,14 +9,14 @@ let auth;
 
 const discordSdk = new DiscordSDK(import.meta.env.VITE_DISCORD_CLIENT_ID);
 
-setupDiscordSdk().then(() => {
+setupDiscordSdk().then(async () => {
   const appContainer = document.querySelector('#app');
 
   // Clear the "Loading" or "Hello World" state
   appContainer.innerHTML = '';
 
-  // Launch your game component
-  renderGame(appContainer);
+  // Launch your game component, pass auth so it can identify the user
+  await renderGame(appContainer, auth);
 
 });
 

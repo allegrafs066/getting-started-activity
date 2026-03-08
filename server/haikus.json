@@ -1,0 +1,92 @@
+[
+    {
+        "id": 1,
+        "lines": [
+            "An old silent pond...",
+            "A frog jumps into the pond,",
+            "splash! Silence again."
+        ],
+        "author": "Matsuo Basho"
+    },
+    {
+        "id": 2,
+        "lines": [
+            "O snail,",
+            "Climb Mount Fuji",
+            "But slowly, slowly!"
+        ],
+        "author": "Kobayashi Issa"
+    },
+    {
+        "id": 3,
+        "lines": [
+            "The light of a candle",
+            "Is transferred to another candle—",
+            "Spring twilight."
+        ],
+        "author": "Yosa Buson"
+    },
+    {
+        "id": 4,
+        "lines": [
+            "In the cicada's cry",
+            "No sign can foretell",
+            "How soon it must die."
+        ],
+        "author": "Matsuo Basho"
+    },
+    {
+        "id": 5,
+        "lines": [
+            "Over the wintry",
+            "Forest, winds howl in rage",
+            "With no leaves to blow."
+        ],
+        "author": "Natsume Soseki"
+    },
+    {
+        "id": 6,
+        "lines": [
+            "A summer river being crossed",
+            "how pleasing",
+            "with sandals in my hands!"
+        ],
+        "author": "Yosa Buson"
+    },
+    {
+        "id": 7,
+        "lines": [
+            "First autumn morning",
+            "the mirror I stare into",
+            "shows my father's face."
+        ],
+        "author": "Murakami Kijo"
+    },
+    {
+        "id": 8,
+        "lines": [
+            "Consider me",
+            "As one who loved poetry",
+            "And persimmons."
+        ],
+        "author": "Masaoka Shiki"
+    },
+    {
+        "id": 9,
+        "lines": [
+            "In the twilight rain",
+            "these brilliant-hued hibiscus",
+            "A lovely sunset."
+        ],
+        "author": "Matsuo Basho"
+    },
+    {
+        "id": 10,
+        "lines": [
+            "Blowing from the west",
+            "Fallen leaves gather",
+            "In the east."
+        ],
+        "author": "Yosa Buson"
+    }
+]
