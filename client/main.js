@@ -117,3 +117,4 @@ document.querySelector('#app').innerHTML = `
     <h1>Authenticating with Discord...</h1>
   </div>
 `;
+// lmao redeploy
