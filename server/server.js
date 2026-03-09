@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
-import Database from "better-sqlite3";
+import { kv } from "@vercel/kv";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
@@ -12,36 +12,9 @@ dotenv.config({ path: "../.env" });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
-
-// ─── Database setup ───────────────────────────────────────────────────────────
-const db = new Database("haikuur.db");
-db.exec(`
-  CREATE TABLE IF NOT EXISTS scores (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id     TEXT    NOT NULL,
-    username    TEXT    NOT NULL,
-    avatar      TEXT,
-    date        TEXT    NOT NULL,
-    haiku_id    INTEGER NOT NULL,
-    wpm         INTEGER NOT NULL,
-    accuracy    INTEGER NOT NULL,
-    created_at  INTEGER NOT NULL,
-    guild_id    TEXT
-  );
-`);
-
-try {
-  db.exec(`ALTER TABLE scores ADD COLUMN guild_id TEXT`);
-} catch (e) { }
-
-try {
-  db.exec(`DROP INDEX idx_user_date`);
-} catch (e) { }
-
-db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_guild_date ON scores (user_id, guild_id, date);`);
 
 // ─── Haiku rotation ──────────────────────────────────────────────────────────
 const haikus = JSON.parse(readFileSync(path.join(__dirname, "haikus.json"), "utf8"));
@@ -75,61 +48,100 @@ app.post("/api/token", async (req, res) => {
 });
 
 // ─── Daily Haiku ─────────────────────────────────────────────────────────────
-app.get("/api/daily", (req, res) => {
-  const dateStr = today();
-  const haiku = getDailyHaiku(dateStr);
-  const guild_id = req.query.guild_id || null;
-  const existing = db
-    .prepare("SELECT wpm, accuracy FROM scores WHERE user_id = ? AND date = ? AND (guild_id = ? OR (guild_id IS NULL AND ? IS NULL))")
-    .get(req.query.user_id, dateStr, guild_id, guild_id);
+app.get("/api/daily", async (req, res) => {
+  try {
+    const dateStr = today();
+    const haiku = getDailyHaiku(dateStr);
+    const userId = req.query.user_id;
+    const guildId = req.query.guild_id || "global";
 
-  res.json({
-    date: dateStr,
-    haiku: { ...haiku, text: haiku.lines.join("\n") },
-    already_played: !!existing,
-    previous_score: existing || null,
-  });
+    let existing = null;
+    if (userId) {
+      existing = await kv.hget(`score:${guildId}:${dateStr}`, userId);
+    }
+
+    res.json({
+      date: dateStr,
+      haiku: { ...haiku, text: haiku.lines.join("\n") },
+      already_played: !!existing,
+      previous_score: existing || null,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // ─── Submit Score ─────────────────────────────────────────────────────────────
-app.post("/api/score", (req, res) => {
-  const { user_id, username, avatar, wpm, accuracy, guild_id } = req.body;
-  const dateStr = today();
-  const haiku = getDailyHaiku(dateStr);
-
-  if (!user_id || !username || wpm == null || accuracy == null) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-
+app.post("/api/score", async (req, res) => {
   try {
-    db.prepare(`
-      INSERT INTO scores (user_id, username, avatar, date, haiku_id, wpm, accuracy, created_at, guild_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(user_id, username, avatar || null, dateStr, haiku.id, wpm, accuracy, Date.now(), guild_id || null);
-    res.json({ success: true });
-  } catch (err) {
-    // Unique constraint violation — user already submitted today
-    if (err.code === "SQLITE_CONSTRAINT_UNIQUE") {
+    const { user_id, username, avatar, wpm, accuracy, guild_id } = req.body;
+    const dateStr = today();
+    const guildId = guild_id || "global";
+
+    if (!user_id || !username || wpm == null || accuracy == null) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Check if already submitted today
+    const existing = await kv.hget(`score:${guildId}:${dateStr}`, user_id);
+    if (existing) {
       return res.status(409).json({ error: "Already submitted today" });
     }
-    throw err;
+
+    const statObj = { user_id, username, avatar, wpm, accuracy, created_at: Date.now() };
+
+    // Save to hash map for user retrieval
+    await kv.hset(`score:${guildId}:${dateStr}`, { [user_id]: statObj });
+
+    // Save to sorted set for leaderboard
+    // Score calculation: prioritize WPM, then accuracy. 
+    // e.g., 120 WPM and 98 Acc = 120098 score
+    const sortScore = (Math.round(wpm) * 1000) + Math.round(accuracy);
+    await kv.zadd(`leaderboard:${guildId}:${dateStr}`, { score: sortScore, member: user_id });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
 // ─── Leaderboard ─────────────────────────────────────────────────────────────
-app.get("/api/leaderboard", (req, res) => {
-  const dateStr = today();
-  const guild_id = req.query.guild_id || null;
-  const rows = db.prepare(`
-    SELECT user_id, username, avatar, wpm, accuracy
-    FROM scores
-    WHERE date = ? AND (guild_id = ? OR (guild_id IS NULL AND ? IS NULL))
-    ORDER BY wpm DESC, accuracy DESC
-    LIMIT 10
-  `).all(dateStr, guild_id, guild_id);
-  res.json({ date: dateStr, scores: rows });
+app.get("/api/leaderboard", async (req, res) => {
+  try {
+    const dateStr = today();
+    const guildId = req.query.guild_id || "global";
+
+    // Get top 10 from sorted set (highest to lowest score)
+    const topUserIds = await kv.zrange(`leaderboard:${guildId}:${dateStr}`, 0, 9, { rev: true });
+
+    if (!topUserIds || topUserIds.length === 0) {
+      return res.json({ date: dateStr, scores: [] });
+    }
+
+    // Get the full stats for each top user
+    const scores = [];
+    for (const uid of topUserIds) {
+      const data = await kv.hget(`score:${guildId}:${dateStr}`, uid);
+      if (data) {
+        scores.push(data);
+      }
+    }
+
+    res.json({ date: dateStr, scores });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
-app.listen(port, () => {
-  console.log(`Server listening at http://localhost:${port}`);
-});
+// In Vercel, don't bind to a port during export
+if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
+  app.listen(port, () => {
+    console.log(`Server listening at http://localhost:${port}`);
+  });
+}
+
+// Export the Express app for Vercel
+export default app;
