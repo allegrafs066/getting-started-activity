@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
-import { kv } from "@vercel/kv";
+import Redis from "ioredis";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
@@ -15,6 +15,9 @@ const app = express();
 const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
+
+// Initialize Redis client using the environment variable provided by Vercel Integration
+const redis = new Redis(process.env.REDIS_URL || process.env.KV_URL);
 
 // ─── Haiku rotation ──────────────────────────────────────────────────────────
 const haikus = JSON.parse(readFileSync(path.join(__dirname, "haikus.json"), "utf8"));
@@ -57,7 +60,8 @@ app.get("/api/daily", async (req, res) => {
 
     let existing = null;
     if (userId) {
-      existing = await kv.hget(`score:${guildId}:${dateStr}`, userId);
+      const raw = await redis.hget(`score:${guildId}:${dateStr}`, userId);
+      if (raw) existing = JSON.parse(raw);
     }
 
     res.json({
@@ -84,7 +88,7 @@ app.post("/api/score", async (req, res) => {
     }
 
     // Check if already submitted today
-    const existing = await kv.hget(`score:${guildId}:${dateStr}`, user_id);
+    const existing = await redis.hget(`score:${guildId}:${dateStr}`, user_id);
     if (existing) {
       return res.status(409).json({ error: "Already submitted today" });
     }
@@ -92,13 +96,13 @@ app.post("/api/score", async (req, res) => {
     const statObj = { user_id, username, avatar, wpm, accuracy, created_at: Date.now() };
 
     // Save to hash map for user retrieval
-    await kv.hset(`score:${guildId}:${dateStr}`, { [user_id]: statObj });
+    await redis.hset(`score:${guildId}:${dateStr}`, user_id, JSON.stringify(statObj));
 
     // Save to sorted set for leaderboard
     // Score calculation: prioritize WPM, then accuracy. 
     // e.g., 120 WPM and 98 Acc = 120098 score
     const sortScore = (Math.round(wpm) * 1000) + Math.round(accuracy);
-    await kv.zadd(`leaderboard:${guildId}:${dateStr}`, { score: sortScore, member: user_id });
+    await redis.zadd(`leaderboard:${guildId}:${dateStr}`, sortScore, user_id);
 
     res.json({ success: true });
   } catch (err) {
@@ -114,7 +118,7 @@ app.get("/api/leaderboard", async (req, res) => {
     const guildId = req.query.guild_id || "global";
 
     // Get top 10 from sorted set (highest to lowest score)
-    const topUserIds = await kv.zrange(`leaderboard:${guildId}:${dateStr}`, 0, 9, { rev: true });
+    const topUserIds = await redis.zrevrange(`leaderboard:${guildId}:${dateStr}`, 0, 9);
 
     if (!topUserIds || topUserIds.length === 0) {
       return res.json({ date: dateStr, scores: [] });
@@ -123,9 +127,9 @@ app.get("/api/leaderboard", async (req, res) => {
     // Get the full stats for each top user
     const scores = [];
     for (const uid of topUserIds) {
-      const data = await kv.hget(`score:${guildId}:${dateStr}`, uid);
-      if (data) {
-        scores.push(data);
+      const raw = await redis.hget(`score:${guildId}:${dateStr}`, uid);
+      if (raw) {
+        scores.push(JSON.parse(raw));
       }
     }
 
