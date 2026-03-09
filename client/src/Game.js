@@ -31,7 +31,8 @@ export async function renderGame(container, auth, discordSdk) {
     // Fetch daily haiku & check if already played
     let dailyData;
     try {
-        const res = await fetch(`/api/daily?user_id=${userId}&guild_id=${guildId || ''}`);
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${apiUrl}/api/daily?user_id=${userId}&guild_id=${guildId || ''}`);
         dailyData = await res.json();
     } catch (e) {
         container.innerHTML = `<div class="loading-screen"><p>Failed to load. Please retry.</p></div>`;
@@ -117,7 +118,8 @@ export async function renderGame(container, auth, discordSdk) {
             const finalStats = { wpm: finalWpm, accuracy: finalAcc };
 
             // Submit score to server, then show results
-            fetch('/api/score', {
+            const apiUrl = import.meta.env.VITE_API_URL || '';
+            fetch(`${apiUrl}/api/score`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: userId, username, avatar, guild_id: guildId, ...finalStats }),
@@ -183,7 +185,8 @@ async function renderResults(container, auth, stats, haikuMeta, justFinished, gu
 
     // Fetch and render leaderboard
     try {
-        const res = await fetch(`/api/leaderboard?guild_id=${guildId || ''}`);
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${apiUrl}/api/leaderboard?guild_id=${guildId || ''}`);
         const data = await res.json();
         const section = document.getElementById('leaderboard-section');
         if (!section) return;

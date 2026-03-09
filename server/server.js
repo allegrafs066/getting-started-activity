@@ -5,12 +5,15 @@ import Database from "better-sqlite3";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
+import cors from "cors";
+
 dotenv.config({ path: "../.env" });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const port = 3001;
+app.use(cors());
 app.use(express.json());
 
 // ─── Database setup ───────────────────────────────────────────────────────────
