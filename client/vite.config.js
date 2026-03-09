@@ -15,6 +15,6 @@ export default defineConfig({
     hmr: {
       clientPort: 443,
     },
-    allowedHosts: ['telecharger-oven-sharon-fallen.trycloudflare.com']
+    allowedHosts: ['lindsay-disposition-ball-behavior.trycloudflare.com']
   },
 });

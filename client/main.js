@@ -16,7 +16,7 @@ setupDiscordSdk().then(async () => {
   appContainer.innerHTML = '';
 
   // Launch your game component, pass auth so it can identify the user
-  await renderGame(appContainer, auth);
+  await renderGame(appContainer, auth, discordSdk);
 
 });
 

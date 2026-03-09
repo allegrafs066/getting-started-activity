@@ -25,10 +25,20 @@ db.exec(`
     haiku_id    INTEGER NOT NULL,
     wpm         INTEGER NOT NULL,
     accuracy    INTEGER NOT NULL,
-    created_at  INTEGER NOT NULL
+    created_at  INTEGER NOT NULL,
+    guild_id    TEXT
   );
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_user_date ON scores (user_id, date);
 `);
+
+try {
+  db.exec(`ALTER TABLE scores ADD COLUMN guild_id TEXT`);
+} catch (e) { }
+
+try {
+  db.exec(`DROP INDEX idx_user_date`);
+} catch (e) { }
+
+db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_guild_date ON scores (user_id, guild_id, date);`);
 
 // ─── Haiku rotation ──────────────────────────────────────────────────────────
 const haikus = JSON.parse(readFileSync(path.join(__dirname, "haikus.json"), "utf8"));
@@ -65,9 +75,10 @@ app.post("/api/token", async (req, res) => {
 app.get("/api/daily", (req, res) => {
   const dateStr = today();
   const haiku = getDailyHaiku(dateStr);
+  const guild_id = req.query.guild_id || null;
   const existing = db
-    .prepare("SELECT wpm, accuracy FROM scores WHERE user_id = ? AND date = ?")
-    .get(req.query.user_id, dateStr);
+    .prepare("SELECT wpm, accuracy FROM scores WHERE user_id = ? AND date = ? AND (guild_id = ? OR (guild_id IS NULL AND ? IS NULL))")
+    .get(req.query.user_id, dateStr, guild_id, guild_id);
 
   res.json({
     date: dateStr,
@@ -79,7 +90,7 @@ app.get("/api/daily", (req, res) => {
 
 // ─── Submit Score ─────────────────────────────────────────────────────────────
 app.post("/api/score", (req, res) => {
-  const { user_id, username, avatar, wpm, accuracy } = req.body;
+  const { user_id, username, avatar, wpm, accuracy, guild_id } = req.body;
   const dateStr = today();
   const haiku = getDailyHaiku(dateStr);
 
@@ -89,9 +100,9 @@ app.post("/api/score", (req, res) => {
 
   try {
     db.prepare(`
-      INSERT INTO scores (user_id, username, avatar, date, haiku_id, wpm, accuracy, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(user_id, username, avatar || null, dateStr, haiku.id, wpm, accuracy, Date.now());
+      INSERT INTO scores (user_id, username, avatar, date, haiku_id, wpm, accuracy, created_at, guild_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(user_id, username, avatar || null, dateStr, haiku.id, wpm, accuracy, Date.now(), guild_id || null);
     res.json({ success: true });
   } catch (err) {
     // Unique constraint violation — user already submitted today
@@ -105,13 +116,14 @@ app.post("/api/score", (req, res) => {
 // ─── Leaderboard ─────────────────────────────────────────────────────────────
 app.get("/api/leaderboard", (req, res) => {
   const dateStr = today();
+  const guild_id = req.query.guild_id || null;
   const rows = db.prepare(`
     SELECT user_id, username, avatar, wpm, accuracy
     FROM scores
-    WHERE date = ?
+    WHERE date = ? AND (guild_id = ? OR (guild_id IS NULL AND ? IS NULL))
     ORDER BY wpm DESC, accuracy DESC
     LIMIT 10
-  `).all(dateStr);
+  `).all(dateStr, guild_id, guild_id);
   res.json({ date: dateStr, scores: rows });
 });
 

@@ -19,10 +19,11 @@ function getCountdownToMidnight() {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export async function renderGame(container, auth) {
+export async function renderGame(container, auth, discordSdk) {
     const userId = auth?.user?.id;
     const username = auth?.user?.username ?? 'Anonymous';
     const avatar = auth?.user?.avatar ?? null;
+    const guildId = discordSdk?.guildId ?? null;
 
     // Show loading state
     container.innerHTML = `<div class="loading-screen"><p>Loading today's haiku...</p></div>`;
@@ -30,7 +31,7 @@ export async function renderGame(container, auth) {
     // Fetch daily haiku & check if already played
     let dailyData;
     try {
-        const res = await fetch(`/api/daily?user_id=${userId}`);
+        const res = await fetch(`/api/daily?user_id=${userId}&guild_id=${guildId || ''}`);
         dailyData = await res.json();
     } catch (e) {
         container.innerHTML = `<div class="loading-screen"><p>Failed to load. Please retry.</p></div>`;
@@ -42,7 +43,7 @@ export async function renderGame(container, auth) {
 
     // Immediately show results if they already played today
     if (dailyData.already_played) {
-        renderResults(container, auth, dailyData.previous_score, haikuMeta, false);
+        renderResults(container, auth, dailyData.previous_score, haikuMeta, false, guildId);
         return;
     }
 
@@ -119,10 +120,10 @@ export async function renderGame(container, auth) {
             fetch('/api/score', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, username, avatar, ...finalStats }),
+                body: JSON.stringify({ user_id: userId, username, avatar, guild_id: guildId, ...finalStats }),
             }).catch(() => { }); // best effort
 
-            renderResults(container, auth, finalStats, haikuMeta, true);
+            renderResults(container, auth, finalStats, haikuMeta, true, guildId);
         }
     });
 }
@@ -140,7 +141,7 @@ function calculateStats(typedText, targetText, startTime) {
     document.getElementById('acc').innerText = isNaN(accuracy) ? 0 : accuracy;
 }
 
-async function renderResults(container, auth, stats, haikuMeta, justFinished) {
+async function renderResults(container, auth, stats, haikuMeta, justFinished, guildId) {
     // Show initial results immediately, then load leaderboard
     container.innerHTML = `
       <div id="results-container">
@@ -182,7 +183,7 @@ async function renderResults(container, auth, stats, haikuMeta, justFinished) {
 
     // Fetch and render leaderboard
     try {
-        const res = await fetch('/api/leaderboard');
+        const res = await fetch(`/api/leaderboard?guild_id=${guildId || ''}`);
         const data = await res.json();
         const section = document.getElementById('leaderboard-section');
         if (!section) return;
@@ -259,48 +260,22 @@ async function generateShareCard(auth, stats, haikuMeta) {
     const userId = auth?.user?.id;
     const username = auth?.user?.username ?? 'Anonymous';
     const avatarHash = auth?.user?.avatar ?? null;
-    const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
     // Background
-    const bg = ctx.createLinearGradient(0, 0, W, H);
-    bg.addColorStop(0, '#1a1a2e');
-    bg.addColorStop(1, '#16213e');
-    ctx.fillStyle = bg;
+    ctx.fillStyle = '#1a1a2e'; // Flat color
     roundRect(ctx, 0, 0, W, H, 20);
     ctx.fill();
 
-    // Subtle grid pattern
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < W; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-
-    // App brand top-left
-    ctx.font = 'bold 18px "Courier New", monospace';
+    // Title middle top
+    ctx.font = 'bold 24px "Courier New", monospace';
     ctx.fillStyle = '#e2b714';
-    ctx.fillText('haikuur', 28, 38);
-
-    // Date top-right
-    ctx.font = '13px Inter, Arial, sans-serif';
-    ctx.fillStyle = '#646669';
-    ctx.textAlign = 'right';
-    ctx.fillText(date, W - 28, 38);
-    ctx.textAlign = 'left';
-
-    // Divider line
-    ctx.strokeStyle = 'rgba(226,183,20,0.25)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(28, 52); ctx.lineTo(W - 28, 52); ctx.stroke();
-
-    // Haiku author
-    ctx.font = 'italic 13px Inter, Arial, sans-serif';
-    ctx.fillStyle = '#8b8987';
-    ctx.fillText(`"${haikuMeta?.author ?? 'Unknown'}"`, 28, 76);
+    ctx.textAlign = 'center';
+    ctx.fillText('Daily Haiku', W / 2, 40);
 
     // ── Avatar ──
-    const avatarSize = 72;
-    const avatarX = W / 2 - avatarSize / 2;
-    const avatarY = 90;
+    const avatarSize = 120;
+    const avatarX = 100;
+    const avatarY = 100;
 
     if (avatarHash && userId) {
         try {
@@ -314,7 +289,7 @@ async function generateShareCard(auth, stats, haikuMeta) {
             ctx.restore();
             // Gold ring
             ctx.strokeStyle = '#e2b714';
-            ctx.lineWidth = 2.5;
+            ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2 + 2, 0, Math.PI * 2);
             ctx.stroke();
@@ -326,27 +301,21 @@ async function generateShareCard(auth, stats, haikuMeta) {
     }
 
     // Username
-    ctx.font = 'bold 16px Inter, Arial, sans-serif';
+    ctx.font = 'bold 20px Inter, Arial, sans-serif';
     ctx.fillStyle = '#d1d0c5';
     ctx.textAlign = 'center';
-    ctx.fillText(username, W / 2, avatarY + avatarSize + 22);
+    ctx.fillText(username, avatarX + avatarSize / 2, avatarY + avatarSize + 30);
 
     // ── Stat boxes ──
-    const boxW = 160, boxH = 76, boxY = H - 106;
-    const gap = 24;
-    const leftX = W / 2 - boxW - gap / 2;
-    const rightX = W / 2 + gap / 2;
+    const boxW = 160, boxH = 80;
+    const statX = 340; // Right side
+    const stat1Y = 70;
+    const stat2Y = 170;
 
     // WPM box
-    drawStatBox(ctx, leftX, boxY, boxW, boxH, 'WPM', String(stats.wpm), '#e2b714');
+    drawStatBox(ctx, statX, stat1Y, boxW, boxH, 'WPM', String(stats.wpm), '#e2b714');
     // ACC box
-    drawStatBox(ctx, rightX, boxY, boxW, boxH, 'ACC', `${stats.accuracy}%`, '#7ec8a4');
-
-    // Bottom tagline
-    ctx.font = '11px Inter, Arial, sans-serif';
-    ctx.fillStyle = '#3a3a4a';
-    ctx.textAlign = 'center';
-    ctx.fillText('discord.gg · daily typing activity', W / 2, H - 14);
+    drawStatBox(ctx, statX, stat2Y, boxW, boxH, 'ACC', `${stats.accuracy}%`, '#7ec8a4');
 
     // Convert to data URL and show in a modal (works in all iframe environments)
     const dataUrl = canvas.toDataURL('image/png');
